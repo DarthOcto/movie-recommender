@@ -5,19 +5,18 @@ import numpy as np
 # Load required data
 @st.cache_data
 def load_data():
-    movie_rankings = pd.read_csv('movie_rankings.csv')  # Replace with your file path
-    S = pd.read_csv('modified_similarity_matrix.csv', index_col=0)  # Precomputed similarity matrix
-    R = pd.read_csv('rmat.csv')
-    return movie_rankings, S, R
-
-# Load data
-movie_rankings, S, R = load_data()
+    # Load movies.dat, similarity matrix (S), and rating matrix (R)
+    movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, names=['MovieID', 'Title', 'Genres'])
+    movie_rankings = pd.read_csv('movie_rankings.csv')  # Limited set of movies for sample ratings
+    S = pd.read_csv('modified_similarity_matrix.csv', index_col=0)  # Similarity matrix
+    R = pd.read_csv('rmat.csv', index_col=0)  # Rating matrix
+    return movies, movie_rankings, S, R
 
 # Function: myIBCF
 def myIBCF(newuser, R, S, top_ratings):
     """
     Input:
-    - newuser: A 3706x1 vector of movie ratings (some NA values).
+    - newuser: A vector of movie ratings (some NA values).
     - R: The rating matrix (users x movies).
     - S: The similarity matrix (movies x movies).
     - top_ratings: Optional DataFrame with popular movies for backup recommendations.
@@ -71,53 +70,53 @@ def myIBCF(newuser, R, S, top_ratings):
 
     return predictions_df  # Return as DataFrame
 
-# Title
-st.title("Movie Recommendation System")
+# Load data
+movies, movie_rankings, S, R = load_data()
 
-# Step 1: Persist Sample Movies for Rating
-st.subheader("Rate These Movies")
-st.write("Rate the following movies to receive personalized recommendations:")
+# Streamlit App Title
+st.title("Movie Recommendation System (System II)")
+
+# Step 1: Present Users with Sample Movies for Rating
+st.subheader("Rate Sample Movies")
+st.write("Rate the following movies to help us generate personalized recommendations:")
 
 # Persist sampled movies using session state
 if "sample_movies" not in st.session_state:
     st.session_state.sample_movies = movie_rankings.sample(10).reset_index(drop=True)
 
-# Display the same list of movies
+# Collect User Ratings
 user_ratings = {}
 for _, row in st.session_state.sample_movies.iterrows():
     movie_id = row['MovieID']
     title = row['Title']
     user_ratings[movie_id] = st.slider(f"{title}", 0, 5, 3)  # Default rating is 3
 
-# Step 2: Process User Input into Vector
+# Step 2: Process User Ratings into Vector
 if st.button("Get Recommendations"):
-    # Initialize a ratings vector
+    # Step 2.1: Initialize a Ratings Vector
     w = np.full(S.shape[0], np.nan)  # NaN for unrated movies
     
-    # Update ratings vector with user input
+    # Step 2.2: Map user input into the vector
     for movie_id, rating in user_ratings.items():
-        movie_idx = movie_rankings[movie_rankings['MovieID'] == movie_id].index[0]
-        w[movie_idx] = rating
-
-    print(w)
-
-    # Placeholder Rating Matrix (build or load your R matrix)
-    #R = pd.DataFrame(np.nan, index=['u1181'], columns=movie_rankings['MovieID'])  # Example format
+        if movie_id in movies['MovieID'].values:  # Ensure movie exists in movies.dat
+            movie_idx = movies[movies['MovieID'] == movie_id].index[0]
+            w[movie_idx] = rating
     
-    # Generate Recommendations
+    # Step 3: Generate Recommendations using myIBCF
     recommendations = myIBCF(w, R, S, movie_rankings)
-
-    #print(recommendations)
     
-    # Display Recommendations
-    st.subheader("Your Top 10 Recommendations")
-    if recommendations is not None:
-        for movie_id in recommendations:
-            movie = movie_rankings[movie_rankings['MovieID'] == movie_id]
-            title = movie['Title'].values[0]
-            st.write(f"- {title}")
+    # Step 4: Display Top 10 Recommendations
+    st.subheader("Your Top 10 Movie Recommendations")
+    if recommendations is not None and not recommendations.empty:
+        for movie_id in recommendations['MovieID']:
+            movie = movies[movies['MovieID'] == movie_id]
+            if not movie.empty:
+                title = movie['Title'].values[0]
+                st.write(f"- {title}")
+            else:
+                st.write(f"- MovieID {movie_id} not found in the database.")
     else:
-        st.write("No recommendations available. Try rating more movies!")
+        st.write("No recommendations available. Please try rating more movies!")
 
 st.markdown("---")
 st.write("Powered by Streamlit")
