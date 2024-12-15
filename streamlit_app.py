@@ -6,9 +6,9 @@ import numpy as np
 @st.cache_data
 def load_data():
     movie_rankings = pd.read_csv('movie_rankings.csv')  # Replace with your file path
-    S = pd.read_csv('similarity_matrix.csv', index_col=0)  # Precomputed similarity matrix
+    S = pd.read_csv('modified_similarity_matrix.csv', index_col=0)  # Precomputed similarity matrix
     R = pd.read_csv('rmat.csv')
-    return movie_rankings, S
+    return movie_rankings, S, R
 
 # Load data
 movie_rankings, S, R = load_data()
@@ -47,7 +47,7 @@ if st.button("Get Recommendations"):
         w[movie_idx] = rating
 
     # Placeholder Rating Matrix (build or load your R matrix)
-    R = pd.DataFrame(np.nan, index=['u1181'], columns=movie_rankings['MovieID'])  # Example format
+    #R = pd.DataFrame(np.nan, index=['u1181'], columns=movie_rankings['MovieID'])  # Example format
     
     # Generate Recommendations
     recommendations = myIBCF(w, R, S)
