@@ -14,9 +14,62 @@ def load_data():
 movie_rankings, S, R = load_data()
 
 # Function: myIBCF
-def myIBCF(newuser, R, S):
-    # Placeholder for IBCF implementation
-    return np.random.choice(movie_rankings['MovieID'], 10, replace=False)  # Dummy recommendation
+def myIBCF(newuser, R, S, top_ratings):
+    """
+    Input:
+    - newuser: A 3706x1 vector of movie ratings (some NA values).
+    - R: The rating matrix (users x movies).
+    - S: The similarity matrix (movies x movies).
+    - top_ratings: Optional DataFrame with popular movies for backup recommendations.
+    
+    Output:
+    - Top 10 movie recommendations for the new user with predicted ratings.
+    """
+    w = newuser.copy()  # User ratings (input)
+    predictions = []  # To store (movie_id, predicted_rating)
+
+    # Step 1: Get movie IDs (from R's columns)
+    movie_ids = R.columns.tolist()
+    
+    # Step 2: Iterate over all movies to compute predictions
+    for i in range(len(w)):
+        if pd.isna(w[i]):  # Only predict for unrated movies
+            movie_id = movie_ids[i]
+            
+            # Step 3: Identify similar movies with ratings
+            similar_movies = S.loc[movie_id].dropna()
+            rated_indices = ~pd.isna(w)  # Indices of rated movies
+            common_movies = similar_movies.index.intersection([movie_ids[j] for j in np.where(rated_indices)[0]])
+            
+            # Step 4: Compute prediction using the formula
+            numerator = 0
+            denominator = 0
+            for sim_movie in common_movies:
+                j = movie_ids.index(sim_movie)  # Find index in newuser
+                similarity = S.loc[movie_id, sim_movie]
+                numerator += similarity * w[j]
+                denominator += abs(similarity)
+                
+            if denominator > 0:
+                predicted_rating = numerator / denominator
+            else:
+                predicted_rating = np.nan
+            
+            predictions.append((movie_id, predicted_rating))
+    
+    # Step 5: Rank predictions and select top 10
+    predictions_df = pd.DataFrame(predictions, columns=['MovieID', 'Predicted Rating']).dropna()
+    predictions_df = predictions_df.sort_values(by='Predicted Rating', ascending=False).head(10)
+    
+    # Step 6: Fill remaining slots with popular movies, if needed
+    if top_ratings is not None and len(predictions_df) < 10:
+        already_rated = set(movie_ids[j] for j in np.where(~pd.isna(w))[0])
+        remaining_movies = top_ratings['MovieID'].loc[~top_ratings['MovieID'].isin(already_rated)]
+        remaining_movies = remaining_movies.head(10 - len(predictions_df))
+        remaining_df = pd.DataFrame({'MovieID': remaining_movies, 'Predicted Rating': np.nan})
+        predictions_df = pd.concat([predictions_df, remaining_df])
+
+    return predictions_df  # Return as DataFrame
 
 # Title
 st.title("Movie Recommendation System")
