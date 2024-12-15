@@ -5,11 +5,35 @@ import numpy as np
 # Load required data
 @st.cache_data
 def load_data():
-    # Load movies.dat, similarity matrix (S), and rating matrix (R)
-    movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, names=['MovieID', 'Title', 'Genres'])
-    movie_rankings = pd.read_csv('movie_rankings.csv')  # Limited set of movies for sample ratings
-    S = pd.read_csv('modified_similarity_matrix.csv', index_col=0)  # Similarity matrix
-    R = pd.read_csv('rmat.csv', index_col=0)  # Rating matrix
+    # Try reading movies.dat with utf-8 encoding, fallback to ISO-8859-1 if error occurs
+    try:
+        movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, 
+                             names=['MovieID', 'Title', 'Genres'], encoding='utf-8')
+    except UnicodeDecodeError:
+        movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, 
+                             names=['MovieID', 'Title', 'Genres'], encoding='ISO-8859-1')
+
+    # Load movie rankings (ensure it exists)
+    try:
+        movie_rankings = pd.read_csv('movie_rankings.csv')
+    except Exception as e:
+        movie_rankings = pd.DataFrame()  # Empty DataFrame if the file can't be loaded
+        st.error(f"Error loading movie_rankings.csv: {e}")
+
+    # Load similarity matrix (ensure it exists)
+    try:
+        S = pd.read_csv('modified_similarity_matrix.csv', index_col=0)
+    except Exception as e:
+        S = pd.DataFrame()  # Empty DataFrame if the file can't be loaded
+        st.error(f"Error loading modified_similarity_matrix.csv: {e}")
+
+    # Load rating matrix (ensure it exists)
+    try:
+        R = pd.read_csv('rmat.csv', index_col=0)
+    except Exception as e:
+        R = pd.DataFrame()  # Empty DataFrame if the file can't be loaded
+        st.error(f"Error loading rmat.csv: {e}")
+
     return movies, movie_rankings, S, R
 
 # Function: myIBCF
@@ -109,7 +133,12 @@ if st.button("Get Recommendations"):
     st.subheader("Your Top 10 Movie Recommendations")
     if recommendations is not None and not recommendations.empty:
         for movie_id in recommendations['MovieID']:
-            movie = movies[movies['MovieID'] == movie_id]
+            # Strip the 'm' prefix from the movie_id in the recommendations
+            movie_id_stripped = movie_id.lstrip('m')  # Remove 'm' from movie ID
+        
+            # Look up the movie in the movies dataset
+            movie = movies[movies['MovieID'] == int(movie_id_stripped)]  # Convert to integer after stripping 'm'
+        
             if not movie.empty:
                 title = movie['Title'].values[0]
                 st.write(f"- {title}")
