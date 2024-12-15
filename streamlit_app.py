@@ -104,6 +104,8 @@ if st.button("Get Recommendations"):
     
     # Generate Recommendations
     recommendations = myIBCF(w, R, S, movie_rankings)
+
+    print(recommendations)
     
     # Display Recommendations
     st.subheader("Your Top 10 Recommendations")
