@@ -11,7 +11,7 @@ def load_data():
     return movie_rankings, S
 
 # Load data
-movie_rankings, S = load_data()
+movie_rankings, S, R = load_data()
 
 # Function: myIBCF
 def myIBCF(newuser, R, S):
