@@ -103,7 +103,7 @@ if st.button("Get Recommendations"):
     #R = pd.DataFrame(np.nan, index=['u1181'], columns=movie_rankings['MovieID'])  # Example format
     
     # Generate Recommendations
-    recommendations = myIBCF(w, R, S)
+    recommendations = myIBCF(w, R, S, movie_rankings)
     
     # Display Recommendations
     st.subheader("Your Top 10 Recommendations")
