@@ -99,13 +99,15 @@ if st.button("Get Recommendations"):
         movie_idx = movie_rankings[movie_rankings['MovieID'] == movie_id].index[0]
         w[movie_idx] = rating
 
+    print(w)
+
     # Placeholder Rating Matrix (build or load your R matrix)
     #R = pd.DataFrame(np.nan, index=['u1181'], columns=movie_rankings['MovieID'])  # Example format
     
     # Generate Recommendations
     recommendations = myIBCF(w, R, S, movie_rankings)
 
-    print(recommendations)
+    #print(recommendations)
     
     # Display Recommendations
     st.subheader("Your Top 10 Recommendations")
