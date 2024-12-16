@@ -80,7 +80,7 @@ if "sample_movies" not in st.session_state:
     st.session_state.sample_movies = movie_rankings.sample(10).reset_index(drop=True)
 
 # Generate new set of 10 random movies
-if st.button("Generate New Movies"):
+if st.button("Find New Movies"):
     # Filter out movies with valid ratings (1-5)
     previously_rated_ids = {
         movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
