@@ -44,7 +44,7 @@ def myIBCF(newuser, R, S, top_ratings):
             similar_movies = S.loc[movie_id].dropna()
             rated_indices = ~pd.isna(w)
             common_movies = similar_movies.index.intersection(
-                [movie_ids[j] for j in np.where(rated_indices)[0]])
+                [movie_ids[j] for j in np.where(rated_indices)[0]] )
             numerator, denominator = 0, 0
             for sim_movie in common_movies:
                 j = movie_ids.index(sim_movie)
@@ -70,7 +70,7 @@ def myIBCF(newuser, R, S, top_ratings):
 movies, movie_rankings, S, R = load_data()
 
 # Streamlit App Title
-st.title("Movie Recommendation System (System II)")
+st.title("Movie Recommendation App")
 
 # Persist rated movies in session state
 if "rated_movies" not in st.session_state:
@@ -127,31 +127,41 @@ for _, row in st.session_state.sample_movies.iterrows():
 # Get recommendations button
 if st.button("Get Recommendations"):
     w = np.full(S.shape[0], np.nan)
-    for movie_id, rating in user_ratings.items():
+
+    # Include the ratings of previously rated movies
+    for movie_id, rating in st.session_state.rated_movies.items():
         if movie_id in movies['MovieID'].values:
             movie_idx = movies[movies['MovieID'] == movie_id].index[0]
             w[movie_idx] = rating
 
+    # Create recommendations based on the updated `w` array
     recommendations = myIBCF(w, R, S, movie_rankings)
 
     st.subheader("Your Top 10 Movie Recommendations")
     if recommendations is not None and not recommendations.empty:
         for movie_id in recommendations['MovieID']:
-            movie_id_stripped = str(movie_id).lstrip('m')
-            movie = movies[movies['MovieID'] == int(movie_id_stripped)]
+            movie_id_stripped = str(movie_id).lstrip('m')  # Remove 'm' from movie ID
+            movie = movies[movies['MovieID'] == int(movie_id_stripped)]  # Convert back to integer for lookup
+
             if not movie.empty:
                 title = movie['Title'].values[0]
-                st.write(f"- {title}")
+                image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id_stripped}.jpg"
+
+                # Display image and title
+                col1, col2 = st.columns([1, 4])  # Adjust layout as needed
+                with col1:
+                    st.image(image_url, width=100)  # Display movie poster
+                with col2:
+                    st.write(f"**{title}**")
             else:
                 st.write(f"- MovieID {movie_id} not found in the database.")
     else:
         st.write("No recommendations available. Please try rating more movies!")
 
-
-        # Button to show rated movies
+# Button to show rated movies
 if st.button("Show Rated Movies"):
     # Display movies the user has already rated (excluding N/A)
-    rated_movies_df = pd.DataFrame([
+    rated_movies_df = pd.DataFrame([ 
         {'MovieID': movie_id, 'Title': movies[movies['MovieID'] == movie_id]['Title'].values[0], 'Rating': rating}
         for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
     ])
@@ -162,7 +172,6 @@ if st.button("Show Rated Movies"):
             st.write(f"- **{row['Title']}**: {row['Rating']} stars")
     else:
         st.write("You haven't rated any movies yet.")
-
 
 st.markdown("---")
 st.write("Powered by Streamlit")
