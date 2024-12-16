@@ -174,7 +174,7 @@ for row in rows:
 
              # Update rating
             user_ratings[movie_id] = st.session_state.get(f"rating_{movie_id}", np.nan)
-st.session_state.rated_movies[movie_id] = user_ratings[movie_id]
+            st.session_state.rated_movies[movie_id] = user_ratings[movie_id]
 
             # Display current rating
             current_rating = st.session_state.get(f"rating_{movie_id}", np.nan)
