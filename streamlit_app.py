@@ -91,38 +91,46 @@ if st.button("Find New Movies"):
         st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
     else:
         st.error("Not enough unrated movies left to generate a new set!")
-
+        
 # Display movies to rate
 user_ratings = {}
-for _, row in st.session_state.sample_movies.iterrows():
-    movie_id = row['MovieID']
-    title = row['Title']
-    image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id}.jpg"
 
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        st.image(image_url, width=100)
-    with col2:
-        st.write(f"**{title}**")
+# Split movies into two rows of five
+num_movies = len(st.session_state.sample_movies)
+rows = [st.session_state.sample_movies.iloc[i:i+5] for i in range(0, num_movies, 5)]
 
-        # Rating buttons
-        if f"rating_{movie_id}" not in st.session_state:
-            if movie_id in st.session_state.rated_movies:
-                st.session_state[f"rating_{movie_id}"] = st.session_state.rated_movies[movie_id]
-            else:
-                st.session_state[f"rating_{movie_id}"] = np.nan
+for row in rows:
+    cols = st.columns(5)  # Create 5 columns for this row
+    for col, (_, movie) in zip(cols, row.iterrows()):
+        movie_id = movie['MovieID']
+        title = movie['Title']
+        image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id}.jpg"
 
-        col_buttons = st.columns(7)
-        for i, label in enumerate(["0", "1", "2", "3", "4", "5", "N/A"]):
-            with col_buttons[i]:
-                if st.button(label, key=f"{movie_id}_{label}"):
-                    st.session_state[f"rating_{movie_id}"] = np.nan if label == "N/A" else int(label)
+        with col:
+            st.image(image_url, width=100)  # Display movie poster
+            st.write(f"**{title}**")  # Display movie title
 
-        user_ratings[movie_id] = st.session_state[f"rating_{movie_id}"]
-        st.session_state.rated_movies[movie_id] = st.session_state[f"rating_{movie_id}"]
+            # Rating buttons
+            if f"rating_{movie_id}" not in st.session_state:
+                if movie_id in st.session_state.rated_movies:
+                    st.session_state[f"rating_{movie_id}"] = st.session_state.rated_movies[movie_id]
+                else:
+                    st.session_state[f"rating_{movie_id}"] = np.nan
 
-        current_rating = st.session_state[f"rating_{movie_id}"]
-        st.write(f"**Current Rating: {int(current_rating) if not pd.isna(current_rating) else 'N/A'}**")
+            # Create rating buttons
+            col_buttons = st.columns(7)
+            for i, label in enumerate(["0", "1", "2", "3", "4", "5", "N/A"]):
+                with col_buttons[i]:
+                    if st.button(label, key=f"{movie_id}_{label}"):
+                        st.session_state[f"rating_{movie_id}"] = np.nan if label == "N/A" else int(label)
+
+            # Update rating
+            user_ratings[movie_id] = st.session_state[f"rating_{movie_id}"]
+            st.session_state.rated_movies[movie_id] = st.session_state[f"rating_{movie_id}"]
+
+            # Display current rating
+            current_rating = st.session_state[f"rating_{movie_id}"]
+            st.write(f"**Current Rating:** {int(current_rating) if not pd.isna(current_rating) else 'N/A'}")
 
 # Get recommendations button
 if st.button("Get Recommendations"):
