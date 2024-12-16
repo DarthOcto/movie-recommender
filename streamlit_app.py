@@ -91,7 +91,7 @@ if st.button("Find New Movies"):
         st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
     else:
         st.error("Not enough unrated movies left to generate a new set!")
-        
+
 # Display movies to rate
 user_ratings = {}
 
@@ -131,7 +131,57 @@ for row in rows:
             # Display current rating
             current_rating = st.session_state[f"rating_{movie_id}"]
             st.write(f"**Current Rating:** {int(current_rating) if not pd.isna(current_rating) else 'N/A'}")
+# Add custom CSS for smaller buttons
+st.markdown("""
+    <style>
+        .small-button button {
+                padding: 0.2rem 0.4rem;  /* Smaller padding for smaller buttons */
+                        font-size: 0.8rem;  /* Reduce font size */
+                                margin: 0.1rem;  /* Add margin between buttons */
+                                    }
+                                        .spacer {
+                                                margin-top: 1rem;  /* Add more spacing between rows */
+                                                    }
+                                                        </style>
+                                                            """, unsafe_allow_html=True)
 
+                                                            # Display movies to rate with adjusted layout
+                                                            user_ratings = {}
+
+                                                            # Split movies into rows of five
+                                                            num_movies = len(st.session_state.sample_movies)
+                                                            rows = [st.session_state.sample_movies.iloc[i:i + 5] for i in range(0, num_movies, 5)]
+
+                                                            for row in rows:
+                                                                cols = st.columns(5)  # Create 5 columns for this row
+                                                                    for col, (_, movie) in zip(cols, row.iterrows()):
+                                                                            movie_id = movie['MovieID']
+                                                                                    title = movie['Title']
+                                                                                            image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id}.jpg"
+
+                                                                                                    with col:
+                                                                                                                st.image(image_url, width=100)  # Display movie poster
+                                                                                                                            st.write(f"**{title}**")  # Display movie title
+
+                                                                                                                                        # Rating buttons with custom CSS
+                                                                                                                                                    with st.container():
+                                                                                                                                                                    col_buttons = st.columns(7)
+                                                                                                                                                                                    for i, label in enumerate(["0", "1", "2", "3", "4", "5", "N/A"]):
+                                                                                                                                                                                                        with col_buttons[i]:
+                                                                                                                                                                                                                                if st.button(label, key=f"{movie_id}_{label}", use_container_width=True, 
+                                                                                                                                                                                                                                                                     type='secondary', help=f"Rate {label}"):
+                                                                                                                                                                                                                                                                                                 st.session_state[f"rating_{movie_id}"] = np.nan if label == "N/A" else int(label)
+
+                                                                                                                                                                                                                                                                                                             # Update rating
+                                                                                                                                                                                                                                                                                                                         user_ratings[movie_id] = st.session_state.get(f"rating_{movie_id}", np.nan)
+                                                                                                                                                                                                                                                                                                                                     st.session_state.rated_movies[movie_id] = user_ratings[movie_id]
+
+                                                                                                                                                                                                                                                                                                                                                 # Display current rating
+                                                                                                                                                                                                                                                                                                                                                             current_rating = st.session_state.get(f"rating_{movie_id}", np.nan)
+                                                                                                                                                                                                                                                                                                                                                                         st.write(f"**Current Rating:** {int(current_rating) if not pd.isna(current_rating) else 'N/A'}")
+
+                                                                                                                                                                                                                                                                                                                                                                             # Add spacing between rows
+                                                                                                                                                                                                                                                                                                                                                                                 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 # Get recommendations button
 if st.button("Get Recommendations"):
     w = np.full(S.shape[0], np.nan)
