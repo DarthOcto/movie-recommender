@@ -72,6 +72,18 @@ movies, movie_rankings, S, R = load_data()
 # Streamlit App Title
 st.title("Movie Recommendation App")
 
+if st.button("Find New Movies"):
+        # Filter out movies with valid ratings (1-5)
+    previously_rated_ids = {
+        movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
+    }
+    available_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
+
+    if len(available_movies) >= 10:
+        st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
+    else:
+        st.error("Not enough unrated movies left to generate a new set!")
+
 # Persist rated movies in session state
 if "rated_movies" not in st.session_state:
     st.session_state.rated_movies = {}  # Store ratings of all movies
@@ -112,7 +124,7 @@ for _, row in st.session_state.sample_movies.iterrows():
         st.write(f"**Current Rating: {int(current_rating) if not pd.isna(current_rating) else 'N/A'}**")
 
 # Display buttons on the same row
-col1, col2, col3 = st.columns([1, 1, 1])  # Create three equally spaced columns
+col1, col2 = st.columns([1, 1])  # Create two equally spaced columns
 
 with col1:
     if st.button("Get Recommendations"):
@@ -163,18 +175,6 @@ with col2:
         else:
             st.write("You haven't rated any movies yet.")
 
-with col3:
-    if st.button("Find New Movies"):
-        # Filter out movies with valid ratings (1-5)
-        previously_rated_ids = {
-            movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
-        }
-        available_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
-
-        if len(available_movies) >= 10:
-            st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
-        else:
-            st.error("Not enough unrated movies left to generate a new set!")
 
 
 
