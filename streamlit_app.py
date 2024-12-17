@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Load required data
+# Load required data with caching
 @st.cache_data
 def load_data():
     try:
@@ -32,42 +32,83 @@ def load_data():
 
     return movies, movie_rankings, S, R
 
-# Function: myIBCF
-def myIBCF(newuser, R, S, top_ratings):
-    w = newuser.copy()
-    predictions = []
-    movie_ids = R.columns.tolist()
+# Optimized IBCF function using vectorization
+def myIBCF_optimized(newuser, R, S, top_ratings, movie_id_to_idx, idx_to_movie_id):
+    """
+    Computes the (transformed) cosine similarity-based predictions for unrated movies.
+    
+    Args:
+        newuser (np.ndarray): Array of user ratings where indices correspond to movie indices.
+        R (np.ndarray): Ratings matrix (movies x users).
+        S (np.ndarray): Similarity matrix (movies x movies).
+        top_ratings (pd.DataFrame): DataFrame containing top-rated movies.
+        movie_id_to_idx (dict): Mapping from MovieID to index.
+        idx_to_movie_id (dict): Mapping from index to MovieID.
+    
+    Returns:
+        pd.DataFrame: Top 10 movie recommendations with predicted ratings.
+    """
+    # Identify rated and unrated movies
+    rated_indices = np.where(~np.isnan(newuser))[0]
+    unrated_indices = np.where(np.isnan(newuser))[0]
 
-    for i in range(len(w)):
-        if pd.isna(w[i]):
-            movie_id = movie_ids[i]
-            similar_movies = S.loc[movie_id].dropna()
-            rated_indices = ~pd.isna(w)
-            common_movies = similar_movies.index.intersection(
-                [movie_ids[j] for j in np.where(rated_indices)[0]] )
-            numerator, denominator = 0, 0
-            for sim_movie in common_movies:
-                j = movie_ids.index(sim_movie)
-                similarity = S.loc[movie_id, sim_movie]
-                numerator += similarity * w[j]
-                denominator += abs(similarity)
-            predicted_rating = numerator / denominator if denominator > 0 else np.nan
-            predictions.append((movie_id, predicted_rating))
+    if len(rated_indices) == 0:
+        # If no movies are rated, return top-rated movies
+        recommendations = top_ratings[['MovieID']].head(10).copy()
+        recommendations['Predicted Rating'] = np.nan
+        return recommendations
 
-    predictions_df = pd.DataFrame(predictions, columns=['MovieID', 'Predicted Rating']).dropna()
-    predictions_df = predictions_df.sort_values(by='Predicted Rating', ascending=False).head(10)
+    # Extract similarities for unrated movies to rated movies
+    S_unrated_rated = S[unrated_indices][:, rated_indices]  # Shape: (num_unrated, num_rated)
 
-    if top_ratings is not None and len(predictions_df) < 10:
-        already_rated = set(movie_ids[j] for j in np.where(~pd.isna(w))[0])
-        remaining_movies = top_ratings['MovieID'].loc[~top_ratings['MovieID'].isin(already_rated)]
-        remaining_movies = remaining_movies.head(10 - len(predictions_df))
+    # Extract ratings for rated movies
+    ratings_rated = newuser[rated_indices]  # Shape: (num_rated,)
+
+    # Compute numerator and denominator
+    numerator = S_unrated_rated.dot(ratings_rated)  # Shape: (num_unrated,)
+    denominator = np.abs(S_unrated_rated).sum(axis=1)  # Shape: (num_unrated,)
+
+    # Avoid division by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        predicted_ratings = np.where(denominator > 0, numerator / denominator, np.nan)
+    
+    # Transform to [0, 1] range
+    predicted_ratings = 0.5 + 0.5 * predicted_ratings
+
+    # Create recommendations DataFrame
+    recommendations = pd.DataFrame({
+        'MovieID': [idx_to_movie_id[idx] for idx in unrated_indices],
+        'Predicted Rating': predicted_ratings
+    }).dropna()
+
+    # Sort and select top 10
+    recommendations = recommendations.sort_values(by='Predicted Rating', ascending=False).head(10)
+
+    # Fill remaining recommendations if needed
+    if top_ratings is not None and len(recommendations) < 10:
+        already_rated_ids = set([idx_to_movie_id[idx] for idx in rated_indices])
+        remaining_movies = top_ratings['MovieID'].loc[~top_ratings['MovieID'].isin(already_rated_ids)]
+        remaining_movies = remaining_movies.head(10 - len(recommendations))
         remaining_df = pd.DataFrame({'MovieID': remaining_movies, 'Predicted Rating': np.nan})
-        predictions_df = pd.concat([predictions_df, remaining_df])
+        recommendations = pd.concat([recommendations, remaining_df], ignore_index=True)
 
-    return predictions_df
+    return recommendations
 
 # Load data
-movies, movie_rankings, S, R = load_data()
+movies, movie_rankings, S_df, R_df = load_data()
+
+# Validate loaded data
+if movies.empty or movie_rankings.empty or S_df.empty or R_df.empty:
+    st.stop()
+
+# Create mappings from MovieID to index and vice versa
+movie_ids = movies['MovieID'].tolist()
+movie_id_to_idx = {movie_id: idx for idx, movie_id in enumerate(movie_ids)}
+idx_to_movie_id = {idx: movie_id for idx, movie_id in enumerate(movie_ids)}
+
+# Convert similarity matrix S and ratings matrix R to NumPy arrays
+S = S_df.loc[movie_ids, movie_ids].to_numpy()  # Ensure order matches movie_ids
+R = R_df[movie_ids].to_numpy()  # Ensure columns match movie_ids
 
 # Streamlit App Title
 st.title("Movie Recommendation App")
@@ -77,111 +118,115 @@ if "rated_movies" not in st.session_state:
     st.session_state.rated_movies = {}  # Store ratings of all movies
 
 if "sample_movies" not in st.session_state:
-    st.session_state.sample_movies = movie_rankings.sample(10).reset_index(drop=True)
-
-# Display movies to rate
-user_ratings = {}
-for _, row in st.session_state.sample_movies.iterrows():
-    movie_id = row['MovieID']
-    title = row['Title']
-    image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id}.jpg"
-
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        st.image(image_url, width=100)
-    with col2:
-        st.write(f"**{title}**")
-
-        # Rating buttons
-        if f"rating_{movie_id}" not in st.session_state:
-            if movie_id in st.session_state.rated_movies:
-                st.session_state[f"rating_{movie_id}"] = st.session_state.rated_movies[movie_id]
-            else:
-                st.session_state[f"rating_{movie_id}"] = np.nan
-
-        col_buttons = st.columns(7)
-        for i, label in enumerate(["0", "1", "2", "3", "4", "5", "N/A"]):
-            with col_buttons[i]:
-                if st.button(label, key=f"{movie_id}_{label}"):
-                    st.session_state[f"rating_{movie_id}"] = np.nan if label == "N/A" else int(label)
-
-        user_ratings[movie_id] = st.session_state[f"rating_{movie_id}"]
-        st.session_state.rated_movies[movie_id] = st.session_state[f"rating_{movie_id}"]
-
-        current_rating = st.session_state[f"rating_{movie_id}"]
-        st.write(f"**Current Rating: {int(current_rating) if not pd.isna(current_rating) else 'N/A'}**")
+    st.session_state.sample_movies = movie_rankings.sample(10, random_state=42).reset_index(drop=True)
 
 # Display buttons on the same row
-col1, col2, col3 = st.columns([1, 1, 1])  # Create three equally spaced columns
+button_col1, button_col2, button_col3 = st.columns(3)
 
-with col1:
+with button_col1:
     if st.button("Get Recommendations"):
+        # Create user rating vector
         w = np.full(S.shape[0], np.nan)
-
-        # Include the ratings of previously rated movies
+        
         for movie_id, rating in st.session_state.rated_movies.items():
-            if movie_id in movies['MovieID'].values:
-                movie_idx = movies[movies['MovieID'] == movie_id].index[0]
+            if movie_id in movie_id_to_idx:
+                movie_idx = movie_id_to_idx[movie_id]
                 w[movie_idx] = rating
 
-        # Create recommendations based on the updated `w` array
-        recommendations = myIBCF(w, R, S, movie_rankings)
+        # Get recommendations
+        recommendations = myIBCF_optimized(
+            newuser=w,
+            R=R,
+            S=S,
+            top_ratings=movie_rankings,
+            movie_id_to_idx=movie_id_to_idx,
+            idx_to_movie_id=idx_to_movie_id
+        )
 
         st.subheader("Your Top 10 Movie Recommendations")
-        if recommendations is not None and not recommendations.empty:
-            for movie_id in recommendations['MovieID']:
-                movie_id_stripped = str(movie_id).lstrip('m')  # Remove 'm' from movie ID
-                movie = movies[movies['MovieID'] == int(movie_id_stripped)]  # Convert back to integer for lookup
+        if not recommendations.empty:
+            for _, row in recommendations.iterrows():
+                movie_id = row['MovieID']
+                title = movies.loc[movies['MovieID'] == movie_id, 'Title'].values[0]
+                image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id}.jpg"
 
-                if not movie.empty:
-                    title = movie['Title'].values[0]
-                    image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id_stripped}.jpg"
-
-                    # Display image and title
-                    col_a, col_b = st.columns([1, 4])  # Adjust layout as needed
-                    with col_a:
-                        st.image(image_url, width=100)  # Display movie poster
-                    with col_b:
-                        st.write(f"**{title}**")
-                else:
-                    st.write(f"- MovieID {movie_id} not found in the database.")
+                col_a, col_b = st.columns([1, 4])
+                with col_a:
+                    st.image(image_url, width=100, use_column_width=False)
+                with col_b:
+                    st.write(f"**{title}**")
         else:
             st.write("No recommendations available. Please try rating more movies!")
 
-with col2:
+with button_col2:
     if st.button("Show Rated Movies"):
         # Display movies the user has already rated (excluding N/A)
-        rated_movies_df = pd.DataFrame([
-            {'MovieID': movie_id, 'Title': movies[movies['MovieID'] == movie_id]['Title'].values[0], 'Rating': rating}
-            for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
-        ])
+        if st.session_state.rated_movies:
+            rated_movies = [
+                {
+                    'MovieID': movie_id,
+                    'Title': movies.loc[movies['MovieID'] == movie_id, 'Title'].values[0],
+                    'Rating': rating
+                }
+                for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
+            ]
 
-        if not rated_movies_df.empty:
-            st.subheader("Your Rated Movies")
-            for _, row in rated_movies_df.iterrows():
-                st.write(f"- **{row['Title']}**: {row['Rating']} stars")
+            if rated_movies:
+                rated_movies_df = pd.DataFrame(rated_movies)
+                st.subheader("Your Rated Movies")
+                for _, row in rated_movies_df.iterrows():
+                    st.write(f"- **{row['Title']}**: {int(row['Rating'])} stars")
+            else:
+                st.write("You haven't rated any movies yet.")
         else:
             st.write("You haven't rated any movies yet.")
 
-# Button: Find New Movies
-with col3:
+with button_col3:
     if st.button("Find New Movies"):
         # Precompute unrated movie IDs
-        if "unrated_movies" not in st.session_state:
-            previously_rated_ids = set(
-                movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
-            )
-            st.session_state.unrated_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
+        previously_rated_ids = set(st.session_state.rated_movies.keys())
+        available_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
 
         # Efficient sampling
-        available_movies = st.session_state.unrated_movies
         if len(available_movies) >= 10:
-            sampled_movies = available_movies.sample(10).reset_index(drop=True)
-            st.session_state.sample_movies = sampled_movies
+            st.session_state.sample_movies = available_movies.sample(10, random_state=42).reset_index(drop=True)
+        elif len(available_movies) > 0:
+            st.session_state.sample_movies = available_movies.sample(len(available_movies), random_state=42).reset_index(drop=True)
+            st.warning(f"Only {len(available_movies)} unrated movies left.")
         else:
-            st.error("Not enough unrated movies left to generate a new set!")
+            st.error("No unrated movies left to generate a new set!")
 
+# Display movies to rate in 2 rows of 5
+num_movies = len(st.session_state.sample_movies)
+rows = [st.session_state.sample_movies.iloc[i:i + 5] for i in range(0, num_movies, 5)]
 
+for row in rows:
+    cols = st.columns(5)
+    for col, (_, movie) in zip(cols, row.iterrows()):
+        movie_id = movie['MovieID']
+        title = movie['Title']
+        image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id}.jpg"
+
+        with col:
+            st.image(image_url, width=100, use_column_width=False)
+            st.write(f"**{title}**")
+
+            # Rating buttons
+            if f"rating_{movie_id}" not in st.session_state:
+                st.session_state[f"rating_{movie_id}"] = st.session_state.rated_movies.get(movie_id, np.nan)
+
+            # Display rating buttons horizontally
+            button_labels = ["0", "1", "2", "3", "4", "5", "N/A"]
+            button_cols = st.columns(len(button_labels))
+            for button_col, label in zip(button_cols, button_labels):
+                with button_col:
+                    if st.button(label, key=f"{movie_id}_{label}"):
+                        st.session_state[f"rating_{movie_id}"] = np.nan if label == "N/A" else int(label)
+                        st.session_state.rated_movies[movie_id] = st.session_state[f"rating_{movie_id}"]
+
+            # Display current rating
+            current_rating = st.session_state[f"rating_{movie_id}"]
+            st.write(f"**Current Rating: {int(current_rating) if not pd.isna(current_rating) else 'N/A'}**")
 
 st.markdown("---")
 st.write("Powered by Streamlit")
