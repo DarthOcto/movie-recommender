@@ -79,19 +79,6 @@ if "rated_movies" not in st.session_state:
 if "sample_movies" not in st.session_state:
     st.session_state.sample_movies = movie_rankings.sample(10).reset_index(drop=True)
 
-# Generate new set of 10 random movies
-if st.button("Find New Movies"):
-    # Filter out movies with valid ratings (1-5)
-    previously_rated_ids = {
-        movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
-    }
-    available_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
-
-    if len(available_movies) >= 10:
-        st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
-    else:
-        st.error("Not enough unrated movies left to generate a new set!")
-
 # Display movies to rate
 user_ratings = {}
 for _, row in st.session_state.sample_movies.iterrows():
@@ -124,54 +111,71 @@ for _, row in st.session_state.sample_movies.iterrows():
         current_rating = st.session_state[f"rating_{movie_id}"]
         st.write(f"**Current Rating: {int(current_rating) if not pd.isna(current_rating) else 'N/A'}**")
 
-# Get recommendations button
-if st.button("Get Recommendations"):
-    w = np.full(S.shape[0], np.nan)
+# Display buttons on the same row
+col1, col2, col3 = st.columns([1, 1, 1])  # Create three equally spaced columns
 
-    # Include the ratings of previously rated movies
-    for movie_id, rating in st.session_state.rated_movies.items():
-        if movie_id in movies['MovieID'].values:
-            movie_idx = movies[movies['MovieID'] == movie_id].index[0]
-            w[movie_idx] = rating
+with col1:
+    if st.button("Get Recommendations"):
+        w = np.full(S.shape[0], np.nan)
 
-    # Create recommendations based on the updated `w` array
-    recommendations = myIBCF(w, R, S, movie_rankings)
+        # Include the ratings of previously rated movies
+        for movie_id, rating in st.session_state.rated_movies.items():
+            if movie_id in movies['MovieID'].values:
+                movie_idx = movies[movies['MovieID'] == movie_id].index[0]
+                w[movie_idx] = rating
 
-    st.subheader("Your Top 10 Movie Recommendations")
-    if recommendations is not None and not recommendations.empty:
-        for movie_id in recommendations['MovieID']:
-            movie_id_stripped = str(movie_id).lstrip('m')  # Remove 'm' from movie ID
-            movie = movies[movies['MovieID'] == int(movie_id_stripped)]  # Convert back to integer for lookup
+        # Create recommendations based on the updated `w` array
+        recommendations = myIBCF(w, R, S, movie_rankings)
 
-            if not movie.empty:
-                title = movie['Title'].values[0]
-                image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id_stripped}.jpg"
+        st.subheader("Your Top 10 Movie Recommendations")
+        if recommendations is not None and not recommendations.empty:
+            for movie_id in recommendations['MovieID']:
+                movie_id_stripped = str(movie_id).lstrip('m')  # Remove 'm' from movie ID
+                movie = movies[movies['MovieID'] == int(movie_id_stripped)]  # Convert back to integer for lookup
 
-                # Display image and title
-                col1, col2 = st.columns([1, 4])  # Adjust layout as needed
-                with col1:
-                    st.image(image_url, width=100)  # Display movie poster
-                with col2:
-                    st.write(f"**{title}**")
-            else:
-                st.write(f"- MovieID {movie_id} not found in the database.")
-    else:
-        st.write("No recommendations available. Please try rating more movies!")
+                if not movie.empty:
+                    title = movie['Title'].values[0]
+                    image_url = f"https://liangfgithub.github.io/MovieImages/{movie_id_stripped}.jpg"
 
-# Button to show rated movies
-if st.button("Show Rated Movies"):
-    # Display movies the user has already rated (excluding N/A)
-    rated_movies_df = pd.DataFrame([ 
-        {'MovieID': movie_id, 'Title': movies[movies['MovieID'] == movie_id]['Title'].values[0], 'Rating': rating}
-        for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
-    ])
+                    # Display image and title
+                    col_a, col_b = st.columns([1, 4])  # Adjust layout as needed
+                    with col_a:
+                        st.image(image_url, width=100)  # Display movie poster
+                    with col_b:
+                        st.write(f"**{title}**")
+                else:
+                    st.write(f"- MovieID {movie_id} not found in the database.")
+        else:
+            st.write("No recommendations available. Please try rating more movies!")
 
-    if not rated_movies_df.empty:
-        st.subheader("Your Rated Movies")
-        for _, row in rated_movies_df.iterrows():
-            st.write(f"- **{row['Title']}**: {row['Rating']} stars")
-    else:
-        st.write("You haven't rated any movies yet.")
+with col2:
+    if st.button("Show Rated Movies"):
+        # Display movies the user has already rated (excluding N/A)
+        rated_movies_df = pd.DataFrame([
+            {'MovieID': movie_id, 'Title': movies[movies['MovieID'] == movie_id]['Title'].values[0], 'Rating': rating}
+            for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
+        ])
+
+        if not rated_movies_df.empty:
+            st.subheader("Your Rated Movies")
+            for _, row in rated_movies_df.iterrows():
+                st.write(f"- **{row['Title']}**: {row['Rating']} stars")
+        else:
+            st.write("You haven't rated any movies yet.")
+
+with col3:
+    if st.button("Find New Movies"):
+        # Filter out movies with valid ratings (1-5)
+        previously_rated_ids = {
+            movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
+        }
+        available_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
+
+        if len(available_movies) >= 10:
+            st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
+        else:
+            st.error("Not enough unrated movies left to generate a new set!")
+
 
 st.markdown("---")
 st.write("Powered by Streamlit")
