@@ -6,10 +6,10 @@ import numpy as np
 @st.cache_data
 def load_data():
     try:
-        movies = pd.read_csv('https://liangfgithub.github.io/MovieData/ratings.dat?raw=true', sep='::', engine='python', header=None, 
+        movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, 
                              names=['MovieID', 'Title', 'Genres'], encoding='utf-8')
     except UnicodeDecodeError:
-        movies = pd.read_csv('https://liangfgithub.github.io/MovieData/ratings.dat?raw=true', sep='::', engine='python', header=None, 
+        movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, 
                              names=['MovieID', 'Title', 'Genres'], encoding='ISO-8859-1')
 
     try:
