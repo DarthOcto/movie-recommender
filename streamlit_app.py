@@ -72,6 +72,8 @@ movies, movie_rankings, S, R = load_data()
 # Streamlit App Title
 st.title("PSL: Movie Recommendation App")
 st.subheader("vanzile2@illinois.edu, Fall 2024")
+st.text("Rate the below set of movies, then click 'Get Recommendations' to get your movie recommendations!")
+st.text("Click 'Find New Movies' to get a new set of movies to rate.")
 
 if st.button("Find New Movies"):
         # Filter out movies with valid ratings (1-5)
