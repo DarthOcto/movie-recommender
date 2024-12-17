@@ -70,7 +70,8 @@ def myIBCF(newuser, R, S, top_ratings):
 movies, movie_rankings, S, R = load_data()
 
 # Streamlit App Title
-st.title("Movie Recommendation App")
+st.title("CE 598 - PSL: Movie Recommendation App")
+st.subheader("vanzile2@illinois.edu, Fall 2024")
 
 if st.button("Find New Movies"):
         # Filter out movies with valid ratings (1-5)
