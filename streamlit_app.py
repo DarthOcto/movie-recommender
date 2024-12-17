@@ -6,26 +6,26 @@ import numpy as np
 @st.cache_data
 def load_data():
     try:
-        movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, 
+        movies = pd.read_csv('https://liangfgithub.github.io/MovieData/ratings.dat?raw=true', sep='::', engine='python', header=None, 
                              names=['MovieID', 'Title', 'Genres'], encoding='utf-8')
     except UnicodeDecodeError:
-        movies = pd.read_csv('movies.dat', sep='::', engine='python', header=None, 
+        movies = pd.read_csv('https://liangfgithub.github.io/MovieData/ratings.dat?raw=true', sep='::', engine='python', header=None, 
                              names=['MovieID', 'Title', 'Genres'], encoding='ISO-8859-1')
 
     try:
-        movie_rankings = pd.read_csv('movie_rankings.csv')
+        movie_rankings = pd.read_csv('https://raw.githubusercontent.com/DarthOcto/movie-recommender/refs/heads/main/movie_rankings.csv')
     except Exception as e:
         movie_rankings = pd.DataFrame()
         st.error(f"Error loading movie_rankings.csv: {e}")
 
     try:
-        S = pd.read_csv('modified_similarity_matrix.csv', index_col=0)
+        S = pd.read_csv('https://raw.githubusercontent.com/DarthOcto/movie-recommender/refs/heads/main/modified_similarity_matrix.csv', index_col=0)
     except Exception as e:
         S = pd.DataFrame()
         st.error(f"Error loading modified_similarity_matrix.csv: {e}")
 
     try:
-        R = pd.read_csv('rmat.csv', index_col=0)
+        R = pd.read_csv('https://raw.githubusercontent.com/DarthOcto/movie-recommender/refs/heads/main/rmat.csv', index_col=0)
     except Exception as e:
         R = pd.DataFrame()
         st.error(f"Error loading rmat.csv: {e}")
