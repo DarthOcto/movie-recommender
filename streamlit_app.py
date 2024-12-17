@@ -124,7 +124,7 @@ with col1:
                 movie_idx = movies[movies['MovieID'] == movie_id].index[0]
                 w[movie_idx] = rating
 
-        # Create recommendations based on the updated w array
+        # Create recommendations based on the updated `w` array
         recommendations = myIBCF(w, R, S, movie_rankings)
 
         st.subheader("Your Top 10 Movie Recommendations")
@@ -163,21 +163,16 @@ with col2:
         else:
             st.write("You haven't rated any movies yet.")
 
-# Button: Find New Movies
 with col3:
     if st.button("Find New Movies"):
-        # Precompute unrated movie IDs
-        if "unrated_movies" not in st.session_state:
-            previously_rated_ids = set(
-                movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
-            )
-            st.session_state.unrated_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
+        # Filter out movies with valid ratings (1-5)
+        previously_rated_ids = {
+            movie_id for movie_id, rating in st.session_state.rated_movies.items() if not pd.isna(rating)
+        }
+        available_movies = movie_rankings[~movie_rankings['MovieID'].isin(previously_rated_ids)]
 
-        # Efficient sampling
-        available_movies = st.session_state.unrated_movies
         if len(available_movies) >= 10:
-            sampled_movies = available_movies.sample(10).reset_index(drop=True)
-            st.session_state.sample_movies = sampled_movies
+            st.session_state.sample_movies = available_movies.sample(10).reset_index(drop=True)
         else:
             st.error("Not enough unrated movies left to generate a new set!")
 
